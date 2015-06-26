@@ -1,4 +1,5 @@
 //rule scheme :
+//在请求发送到服务端前对参数做一些调整
 
 module.exports = {
 

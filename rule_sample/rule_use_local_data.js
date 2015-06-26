@@ -1,4 +1,6 @@
 //replace all the images with local one
+//把图片响应映射到本地
+
 var fs      = require("fs");
 
 var LOCAL_IMAGE = "/Users/path/to/image.png";

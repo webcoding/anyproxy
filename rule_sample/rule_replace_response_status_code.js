@@ -1,4 +1,5 @@
 //rule scheme :
+//改变服务端响应的http状态码
 
 module.exports = {
 

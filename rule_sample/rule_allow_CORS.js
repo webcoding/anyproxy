@@ -1,5 +1,6 @@
 //rule scheme :
 // Ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
+// 为ajax请求增加跨域头
 
 module.exports = {
     shouldUseLocalResponse : function(req,reqBody){

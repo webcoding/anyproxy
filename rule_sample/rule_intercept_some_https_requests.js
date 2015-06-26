@@ -1,4 +1,5 @@
 //rule scheme :
+//截获github.com的https请求，再在最后加点文字
 
 module.exports = {
 

@@ -2,6 +2,9 @@
 read the following wiki before using rule file
 https://github.com/alibaba/anyproxy/wiki/What-is-rule-file-and-how-to-write-one
 */
+
+//为请求绑定目标ip
+
 module.exports = {
 
     summary:function(){

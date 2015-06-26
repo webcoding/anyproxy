@@ -1,4 +1,5 @@
 //rule scheme :
+//把所有的响应延迟1500毫秒
 
 module.exports = {
 
