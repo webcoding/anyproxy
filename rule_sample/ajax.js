@@ -54,19 +54,20 @@ module.exports = {
         */
 
         //options : http://nodejs.org/api/http.html#http_http_request_options_callback
-        if(newOption.hostname == "127.0.0.1" && newOption.port == "8080"){
-            if(newOption.path=="/home.php" ){
-                newOption.hostname = "m.jjhh.com";
-                newOption.path = "/jjhh/home.php";
-                newOption.port     = "80";
-            }
-
+        //if(newOption.hostname == "m.iqianggou.com" && /\/api\//.testnewOption.path ){
+        if(/\/api\//.test(newOption.path) ){
+            // if(newOption.path=="/home.php" ){
+            //     newOption.hostname = "m.jjhh.com";
+            //     newOption.path = "/jjhh/home.php";
+            //     newOption.port     = "80";
+            // }
+            newOption.hostname = "staging.iqianggou.com";
             //TODO: 以下静态资源没有全部正确加载，为什么呢？？？
             //目前，没正确加载的 mime type 为 text/html，正确加载的为 image/jpeg
-            if(/\.(png|gif|jpg|jpeg)$/.test(req.url)){
-                newOption.hostname = "m.jjhh.com";
-                newOption.port     = "80";
-            }
+            // if(/\.(png|gif|jpg|jpeg)$/.test(req.url)){
+            //     newOption.hostname = "m.jjhh.com";
+            //     newOption.port     = "80";
+            // }
         }
 
         return newOption;
