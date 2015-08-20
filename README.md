@@ -13,9 +13,8 @@ AnyProxy
 [download-url]: https://npmjs.org/package/anyproxy
 
 A fully configurable proxy in NodeJS, which can handle HTTPS requests perfectly.
-(Chinese in this doc is nothing but translation of some key points. Be relax if you dont understand.)
 
-[中文wiki - 代理服务器的新轮子](https://github.com/alibaba/anyproxy/wiki/%E4%BB%A3%E7%90%86%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%9A%84%E6%96%B0%E8%BD%AE%E5%AD%90%EF%BC%9Aanyproxy) ，介绍我们为什么要再造一个代理服务器，anyproxy开放式的设计可以解决什么样的问题。
+(Chinese in this doc is nothing but translation of some key points. Be relax if you dont understand.)
 
 <img src="http://gtms04.alicdn.com/tps/i4/TB1XfxDHpXXXXXpapXX20ySQVXX-512-512.png" width="250" height="250" alt="anyproxy logo" />
 
@@ -25,6 +24,10 @@ A fully configurable proxy in NodeJS, which can handle HTTPS requests perfectly.
 * 支持低网速模拟
 * 支持二次开发，可以用javascript控制代理的全部流程，搭建前端个性化调试环境
 * 提供web版界面，观测请求情况
+* 中文文档：
+    * [代理服务器的新轮子](https://github.com/alibaba/anyproxy/wiki/%E4%BB%A3%E7%90%86%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%9A%84%E6%96%B0%E8%BD%AE%E5%AD%90%EF%BC%9Aanyproxy) ，介绍AnyProxy的设计初衷，以及它的开放式设计可以解决什么问题。
+    * [HTTPS相关教程](https://github.com/alibaba/anyproxy/wiki/HTTPS%E7%9B%B8%E5%85%B3%E6%95%99%E7%A8%8B)，讲解如何配置AnyProxy的https特性
+* 中文主页：[http://anyproxy.io](http://anyproxy.io)
 
 Feature
 ------------
@@ -113,7 +116,6 @@ var options = {
     dbFile        : null,  // optional, save request data to a specified file, will use in-memory db if not specified
     webPort       : 8002,  // optional, port for web interface
     socketPort    : 8003,  // optional, internal port for web socket, replace this when it is conflict with your own service
-    webConfigPort : 8088,  // optional, internal port for web config(beta), replace this when it is conflict with your own service
     throttle      : 10,    // optional, speed limit in kb/s
     disableWebInterface : false, //optional, set it when you don't want to use the web interface
     silent        : false //optional, do not print anything into terminal. do not set it when you are still debugging.

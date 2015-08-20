@@ -3,28 +3,29 @@ try{
 }catch(e){}
 
 var http = require('http'),
-    https          = require('https'),
-    fs             = require('fs'),
-    async          = require("async"),
-    url            = require('url'),
-    program        = require('commander'),
-    color          = require('colorful'),
-    certMgr        = require("./lib/certMgr"),
-    getPort        = require("./lib/getPort"),
-    requestHandler = require("./lib/requestHandler"),
-    Recorder       = require("./lib/recorder"),
-    logUtil        = require("./lib/log"),
-    inherits       = require("util").inherits,
-    util           = require("./lib/util"),
-    path           = require("path"),
-    juicer         = require('juicer'),
-    events         = require("events"),
-    express        = require("express"),
-    ip             = require("ip"),
-    fork           = require("child_process").fork,
-    ThrottleGroup  = require("stream-throttle").ThrottleGroup,
-    iconv          = require('iconv-lite'),
-    Buffer         = require('buffer').Buffer;
+    https           = require('https'),
+    fs              = require('fs'),
+    async           = require("async"),
+    url             = require('url'),
+    program         = require('commander'),
+    color           = require('colorful'),
+    certMgr         = require("./lib/certMgr"),
+    getPort         = require("./lib/getPort"),
+    requestHandler  = require("./lib/requestHandler"),
+    Recorder        = require("./lib/recorder"),
+    logUtil         = require("./lib/log"),
+    wsServer        = require("./lib/wsServer"),
+    webInterface    = require("./lib/webInterface"),
+    inherits        = require("util").inherits,
+    util            = require("./lib/util"),
+    path            = require("path"),
+    juicer          = require('juicer'),
+    events          = require("events"),
+    express         = require("express"),
+    ip              = require("ip"),
+    ThrottleGroup   = require("stream-throttle").ThrottleGroup,
+    iconv           = require('iconv-lite'),
+    Buffer          = require('buffer').Buffer;
 
 var T_TYPE_HTTP            = 0,
     T_TYPE_HTTPS           = 1,
@@ -36,20 +37,6 @@ var T_TYPE_HTTP            = 0,
     DEFAULT_TYPE           = T_TYPE_HTTP;
 
 var default_rule = require('./lib/rule_default');
-
-//may be unreliable in windows
-try{
-    var anyproxyHome = path.join(util.getUserHome(),"/.anyproxy/");
-    if(!fs.existsSync(anyproxyHome)){
-        fs.mkdirSync(anyproxyHome);
-    }
-    if(fs.existsSync(path.join(anyproxyHome,"rule_default.js"))){
-        default_rule = require(path.join(anyproxyHome,"rule_default"));
-    }
-    if(fs.existsSync(path.join(process.cwd(),'rule.js'))){
-        default_rule = require(path.join(process.cwd(),'rule'));
-    }
-}catch(e){}
 
 //option
 //option.type     : 'http'(default) or 'https'
@@ -76,7 +63,9 @@ function proxyServer(option){
         socketPort          = option.socketPort    || DEFAULT_WEBSOCKET_PORT, //port for websocket
         proxyConfigPort     = option.webConfigPort || DEFAULT_CONFIG_PORT,    //port to ui config server
         disableWebInterface = !!option.disableWebInterface,
-        ifSilent            = !!option.silent;
+        ifSilent            = !!option.silent,
+        webServerInstance,
+        ws;
 
     if(ifSilent){
         logUtil.setPrintStatus(false);
@@ -90,6 +79,12 @@ function proxyServer(option){
 
     if(!!option.interceptHttps){
         default_rule.setInterceptFlag(true);
+
+        //print a tip when using https features in Node < v0.12
+        var nodeVersion = Number(process.version.match(/^v(\d+\.\d+)/)[1]);
+        if(nodeVersion < 0.12){
+            logUtil.printLog(color.red("node >= v0.12 is required when trying to intercept HTTPS requests :("), logUtil.T_ERR);
+        }
     }
 
     if(option.throttle){
@@ -116,126 +111,72 @@ function proxyServer(option){
                             callback(null);
                         }
                     });
-
                 }else{
                     self.httpProxyServer = http.createServer(requestHandler.userRequestHandler);
                     callback(null);
                 }
             },
 
-            //listen CONNECT method for https over http
+            //handle CONNECT request for https over http
             function(callback){
                 self.httpProxyServer.on('connect',requestHandler.connectReqHandler);
+                callback(null);
+            },
 
+            //start proxy server
+            function(callback){
                 self.httpProxyServer.listen(proxyPort);
                 callback(null);
+            },
+
+            //start web socket service
+            function(callback){
+                ws = new wsServer({port : socketPort});
+                callback(null)
             },
 
             //start web interface
             function(callback){
                 if(disableWebInterface){
                     logUtil.printLog('web interface is disabled');
-                    callback(null);
                 }else{
+                    var config = {
+                        port         : proxyWebPort,
+                        wsPort       : socketPort,
+                        userRule     : proxyRules,
+                        ip           : ip.address()
+                    };
 
-                    var customMenuConfig = proxyRules.customMenu,
-                        menuList    = [],
-                        menuListStr;
-
-                    if(customMenuConfig && customMenuConfig.length){
-                        for(var i = 0 ; i < customMenuConfig.length ; i++){
-                            menuList.push(customMenuConfig[i].name);
-                        }
-                    }
-                    menuListStr = menuList.join("@@@");
-
-                    //web interface
-                    var args = [proxyWebPort, socketPort, proxyConfigPort, requestHandler.getRuleSummary(), ip.address(),menuListStr];
-                    var child_webServer = fork(path.join(__dirname,"./webServer.js"),args);
-                    child_webServer.on("message",function(data){
-                        if(data.type == "reqBody" && data.id){
-
-                            GLOBAL.recorder.getSingleRecord(data.id,function(err,doc){
-                                var result;
-                                try{
-                                    var record = doc[0],
-                                        resHeader   = record['resHeader'] || {},
-                                        bodyContent = GLOBAL.recorder.getBody(data.id);
-
-                                    result = bodyContent;
-                                    //detect charset and convert to utf8 for web interface
-                                    try{
-                                        var charsetMatch = JSON.stringify(resHeader).match(/charset="?([a-zA-Z0-9\-]+)"?/);
-                                        if(charsetMatch && charsetMatch.length > 1){
-                                            var currentCharset = charsetMatch[1].toLowerCase();
-                                            if(currentCharset != "utf-8" && iconv.encodingExists(currentCharset)){
-                                                result = iconv.decode(bodyContent, currentCharset);
-                                            }
-                                        }
-                                    }catch(e){}
-
-                                    child_webServer.send({
-                                        type : "body",
-                                        id   : data.id,
-                                        body : result.toString()
-                                    });
-                                }catch(e){
-                                    child_webServer.send({
-                                        type : "body",
-                                        id   : null,
-                                        body : null,
-                                        error:e.toString()
-                                    });
-                                }
-                            });
-                        }
-                    });
-
-                    //watch dog
-                    setInterval(function(argument) {
-                        child_webServer.send({
-                            type:"watch"
-                        });
-                    },5000);
-
-                    //kill web server when father process exits
-                    process.on("exit",function(code){
-                        child_webServer.kill();
-                        logUtil.printLog('AnyProxy is about to exit with code: ' + code, logUtil.T_ERR);
-                        process.exit();
-                    });
-
-                    process.on("uncaughtException",function(err){
-                        child_webServer.kill();
-                        logUtil.printLog('Caught exception: ' + err, logUtil.T_ERR);
-                        process.exit();
-                    });
-
-                    GLOBAL.recorder.on("update",function(data){
-                        child_webServer.send({
-                            type: "update",
-                            body: data
-                        });
-                    });
-
-                    var configServer = new UIConfigServer(proxyConfigPort);
-                    configServer.on("rule_changed",function() {});
-
-                    var tipText,webUrl;
-                    webUrl  = "http://" + ip.address() + ":" + proxyWebPort +"/";
-                    tipText = "GUI interface started at : " + webUrl;
-                    logUtil.printLog(color.green(tipText));
-
-                    // tipText = "[alpha]qr code to for iOS client: " + webUrl + "qr";
-                    // logUtil.printLog(color.green(tipText));
-                    callback(null);
+                    webServerInstance = new webInterface(config);
                 }
+                callback(null);
+            },
+
+            //server status manager
+            function(callback){
+
+                process.on("exit",function(code){
+                    logUtil.printLog('AnyProxy is about to exit with code: ' + code, logUtil.T_ERR);
+                    process.exit();
+                });
+
+                process.on("uncaughtException",function(err){
+                    logUtil.printLog('Caught exception: ' + (err.stack || err), logUtil.T_ERR);
+                    process.exit();
+                });
+
+                callback(null);
             }
         ],
 
         //final callback
         function(err,result){
             if(!err){
+                var webTip,webUrl;
+                webUrl = "http://" + ip.address() + ":" + proxyWebPort +"/";
+                webTip = "GUI interface started at : " + webUrl;
+                logUtil.printLog(color.green(webTip));
+
                 var tipText = (proxyType == T_TYPE_HTTP ? "Http" : "Https") + " proxy started at " + color.bold(ip.address() + ":" + proxyPort);
                 logUtil.printLog(color.green(tipText));
             }else{
@@ -252,86 +193,7 @@ function proxyServer(option){
     }
 }
 
-// BETA : UIConfigServer
-function UIConfigServer(port){
-    var self = this;
-
-    var app          = express(),
-        customerRule = {
-            summary: function(){
-                logUtil.printLog("replace some response with local response");
-                return "replace some response with local response";
-            }
-        },
-        userKey;
-
-    port = port || DEFAULT_CONFIG_PORT;
-
-    customerRule.shouldUseLocalResponse = function(req,reqBody){
-        var url = req.url;
-        if(userKey){
-            var ifMatch = false;
-            userKey.map(function(item){
-                if(ifMatch) return;
-
-                var matchCount = 0;
-                if( !item.urlKey && !item.reqBodyKey){
-                    ifMatch = false;
-                    return;
-                }else{
-                    if(!item.urlKey || (item.urlKey && url.indexOf(item.urlKey) >= 0 ) ){
-                        ++matchCount;
-                    }
-
-                    if(!item.reqBodyKey || (item.reqBodyKey && reqBody.toString().indexOf(item.reqBodyKey) >= 0) ){
-                        ++matchCount;
-                    }
-
-                    ifMatch = (matchCount==2);
-                    if(ifMatch){
-                        req.willResponse = item.localResponse;
-                    }
-                }
-            });
-
-            return ifMatch;
-        }else{
-            return false;
-        }
-    };
-
-    customerRule.dealLocalResponse = function(req,reqBody,callback){
-        callback(200,{"content-type":"text/html"},req.willResponse);
-        return req.willResponse;
-    };
-
-    app.post("/update",function(req,res){
-        var data = "";
-        req.on("data",function(chunk){
-            data += chunk;
-        });
-
-        req.on("end",function(){
-            userKey = JSON.parse(data);
-
-            res.statusCode = 200;
-            res.setHeader("Content-Type", "application/json;charset=UTF-8");
-            res.end(JSON.stringify({success : true}));
-
-            requestHandler.setRules(customerRule);
-            self.emit("rule_changed");
-        });
-    });
-
-    app.use(express.static(__dirname + "/web_uiconfig"));
-    app.listen(port);
-
-    self.app = app;
-}
-
-inherits(UIConfigServer, events.EventEmitter);
-
-
 module.exports.proxyServer        = proxyServer;
 module.exports.generateRootCA     = certMgr.generateRootCA;
 module.exports.isRootCAFileExists = certMgr.isRootCAFileExists;
+module.exports.setRules           = requestHandler.setRules;
