@@ -19,18 +19,10 @@ module.exports = {
 
     //是否在本地直接发送响应（不再向服务器发出请求）
     shouldUseLocalResponse : function(req,reqBody){
-        if(req.method == "OPTIONS"){
-            return true;
-        }else{
-            return false;
-        }
-        // return false;
+        return false;
     },
 
     dealLocalResponse : function(req,reqBody,callback){
-        if(req.method == "OPTIONS"){
-            callback(200,mergeCORSHeader(req.headers),"");
-        }
         callback(statusCode,resHeader,responseData)
     },
 
@@ -62,19 +54,18 @@ module.exports = {
         */
 
         //options : http://nodejs.org/api/http.html#http_http_request_options_callback
-        if(option.hostname == "10.0.0.119" ){
+        if(option.hostname == "h5.yanzhanjun.iqg.iqianggou.lab" ){
             console.log('已经重定向')
         }
-        if(option.hostname == "10.0.0.119" ){
-            if( /^\/api\//.test(option.path) ){
+        if(option.hostname == "m.iqianggou.com" ){
+            if( !/^\/api\//.test(option.path) ){
                 console.log('这是请求：' + option.path)
                 // if(newOption.path=="/home.php" ){
                 //     newOption.hostname = "m.jjhh.com";
                 //     newOption.path = "/jjhh/home.php";
                 //     newOption.port     = "80";
                 // }
-                newOption.port     = "8181";
-                newOption.hostname = "dev.iqianggou.lab";
+                //newOption.hostname = "h5.yanzhanjun.iqg.iqianggou.lab";
                 //TODO: 以下静态资源没有全部正确加载，为什么呢？？？
                 //目前，没正确加载的 mime type 为 text/html，正确加载的为 image/jpeg
                 // if(/\.(png|gif|jpg|jpeg)$/.test(req.url)){
@@ -105,9 +96,8 @@ module.exports = {
 
     //替换服务器响应的http头 Here header == res.headers
     replaceResponseHeader: function(req,res,header){
-        //var newHeader = header || {};
-        return mergeCORSHeader(req.headers, header);
-        //return newHeader;
+        var newHeader = header || {};
+        return newHeader;
     },
 
     //替换服务器响应的数据
@@ -121,19 +111,3 @@ module.exports = {
         return timeInMS; 
     }
 };
-
-function mergeCORSHeader(reqHeader,originHeader){
-    var targetObj = originHeader || {};
-
-    delete targetObj["Access-Control-Allow-Credentials"];
-    delete targetObj["Access-Control-Allow-Origin"];
-    delete targetObj["Access-Control-Allow-Methods"];
-    delete targetObj["Access-Control-Allow-Headers"];
-
-    targetObj["access-control-allow-credentials"] = "true";
-    targetObj["access-control-allow-origin"]      = reqHeader['origin'] || "-___-||";
-    targetObj["access-control-allow-methods"]     = "GET, POST, PUT";
-    targetObj["access-control-allow-headers"]     = reqHeader['access-control-request-headers'] || "-___-||";
-
-    return targetObj;
-}
